@@ -681,5 +681,41 @@ module Geokit
         GeoLoc.new
       end
     end   
+  
+    # Testing SAPO Geocoder
+    class SAPOGeocoder < Geocoder
+
+      private
+      def self.do_geocode(address, options = {})
+        address_str = address.is_a?(GeoLoc) ? address.to_geocodeable_s : address
+        
+        query = "q=" + Geokit::Inflector::url_escape(address_str)
+        url = "http://services.sapo.pt/Maps/Search"
+        
+        url = "#{url}?#{query}"
+        res = self.call_geocoder_service(url)
+        
+        return GeoLoc.new if !res.is_a?(Net::HTTPSuccess)
+        xml = res.body
+        logger.debug "SAPOGeocoder Address: #{address}. Result: #{xml}"
+        
+        doc = REXML::Document.new(xml)
+        if doc.elements['//POI']
+          res = GeoLoc.new
+          
+          res.lat = doc.elements['//Latitude'].text
+          res.lng = doc.elements['//Longitude'].text
+          res.success = true
+          return res
+        else 
+          logger.info "SAPO was unable to geocode address: "+address
+          return GeoLoc.new
+        end   
+
+        rescue 
+          logger.info "Caught an error during SAPO geocoding call: "+$!
+          return GeoLoc.new
+      end
+    end
   end
 end
